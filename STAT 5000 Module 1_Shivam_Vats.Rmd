@@ -1,0 +1,294 @@
+---
+title: "STAT 5000 Module 1"
+author: "Shivam Vats"
+date: "2022-08-30"
+output: word_document
+---
+
+# Project
+
+### Agriculture employs a majority of people across Africa and makes up a significant portion of most country's gross domestic product (GDP). As a result, understanding the productivity and sustainability of farming is important for improving livelihoods across the continent. While there are some large and medium farms, most countries' agriculture is made up predominantly of smallholder farmers (<10 acres). Smallholder farmers face a unique set of challenges. Irongically, smallholder farmers are some of the most food insecure populations globally, but also provide a majority of the world's population with food. Smallholder farmers are also unable to benefit from economies of scale, leaving them resource poor and risk intolerant. For example, smallholder farmers are frequently unable to prevent post-harvest losses (food loss) which can further exacerbate food insecurity. The purpose of this project is to identify the variables that contribute to post-harvest losses for farmers across Africa. We use data from a study of over 9,500 farmers across different countries in Africa. 
+
+### The raw data contains 9597 rows and 1754 columns with information related to agricultural practices. We use this data to address the following questions:
+###   1. What countries experience the highest rates of post-harvest loss?
+###   2. What sub-regions within countries experience the highest rate of food loss? 
+###   3. What is the relationship between farm size and post-harvest losses? 
+###   4. What is the relationship between household income and post-harvest losses? 
+###   5. What is the relationship between farm productivity and post-harvest losses? 
+###   6. What is the relationship between household income and farm productivity? 
+###   7. Do farmers with access to extension services experience less post-harvest losses? 
+###   8. Which crops are most prone to post-harvest losses? 
+###   9. What is the relationship between household size and post-harvest losses? 
+###   10. Do heads of households with primary occupations other than farming experience more or less loss than farmers with farming as their primary occupation? 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Raw Data
+This data comes from a study of over 9,500 farmers across different countries in Africa. The raw data contains 9597 rows and 1754 columns with information related to agricultural practices.
+```{r}
+rawData <- read.csv('data.csv')
+```
+
+# Extract key variables for analysis
+```{r}
+extractData <- rawData[,c('farmtype', 'hhsize', 'hhelectric', 'hhhdocc1', 'fplotarea1', 'plotunits', 'yearsuse1', 'farmsalev', 's1p1c1area','s1p1c1qharv', 's1p1c1cons', 's1p1c1lives', 's1p1c1lost', 's1p1c1sold', 'pc1', 'extc', 'adm0',  'adm1', 'incfarm','incnfarm')] #extracts columns from raw data set to updated dataset
+
+# removed 'wagehhm', 'wagehhf','s1p1c1cval', 's1p1fert', 's1p1pest','extccost','rentplot1' because there were too many NAs
+```
+# Clean data
+```{r Data Cleaning}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(plotrix)
+# remove rows of categorical variables with NA
+
+countNas1 <- colSums(is.na(extractData)) #determines the number of NAs in each column before cleaning
+
+#we remove all NAs associated with the key variable of interest, which is loss (s1p1c1lost). 
+
+cleanData1 <- extractData[complete.cases(extractData[,c("s1p1c1lost")]),] #removes all rows that contain no loss data
+countNas2 <- colSums(is.na(cleanData1)) #recounts the number of NAs in each column
+
+# Additionally, we remove any variables that have NAs from categorical which are less than 10% of the total number of  observations (~9500) 
+
+cleanData2 <- cleanData1[complete.cases(cleanData1[,c("farmtype", "hhelectric", "hhhdocc1", "pc1", "extc", "adm0", "adm1")]),] #removes rows with NAs for categorical variables with <10% NAs 
+countNas3 <- colSums(is.na(cleanData2)) #recounts the number of Nas in each column
+
+finalData <- cleanData2 %>% 
+  group_by('cleanData2$adm0') %>% 
+ mutate_at(vars('hhsize', 'yearsuse1', 'farmsalev','s1p1c1area', 's1p1c1qharv', 's1p1c1cons', 's1p1c1lives', 's1p1c1sold', 'incfarm', 'incnfarm'), ~replace_na(., median(., na.rm = TRUE))) #calacultes the country-level mean for each quantitative variable and replaces NAs with the median
+finalNaCount <- colSums(is.na(finalData)) #recounds the number of NAs in each column
+print(finalNaCount)
+```
+
+# Visualizations
+
+```{r}
+# Visualization 1
+attach(finalData)
+# Figure 1
+pairs(~hhsize + yearsuse1 + farmsalev + s1p1c1area + s1p1c1qharv +s1p1c1cons+ + s1p1c1lives +s1p1c1sold + s1p1c1lost+incfarm + incnfarm)
+```
+
+```{r}
+# Visualization 2
+# Harvested vs Sold
+plot(s1p1c1qharv, s1p1c1sold, main="Harvested vs Sold",
+     xlab="Harvested", ylab="Sold", pch=19)
+
+zoomInPlot(s1p1c1qharv, s1p1c1sold,           
+           #zoomtitle = '"Harvested" vs "Sold"',
+           rxlim = c(0.0, 500), # X-axis limits
+           rylim = c(0.0, 1000)) # Y-axis limits
+
+cor(s1p1c1qharv, s1p1c1sold, method = c("pearson", "kendall", "spearman"))
+cor.test(s1p1c1qharv, s1p1c1sold, method=c("pearson", "kendall", "spearman"))
+```
+
+```{r}
+# Visualization 3
+# Defining Productivity
+colSums(finalData==0) #Checking for data containing fplotarea as zero
+finalData1 <- finalData[finalData$fplotarea1>0, ] #Removing the rows with fplotarea having zero value
+finalData1$productivity <- finalData1$s1p1c1qharv/finalData1$fplotarea1 #Defining Productivity
+
+# Remove Outliers
+summary(finalData1$productivity) #Checking for outliers
+finalData2 <- finalData1[finalData1$productivity<=1500+1.5*IQR(finalData1$productivity), ]  #the observations which are more than 1.5 IQR above Q3 are considered outliers
+
+#Productivity vs Country
+#Box Plot
+
+Country <- finalData2$adm0
+ggplot(finalData2, aes(x = Country, y = productivity, color = Country)) + ggtitle("Productivity by Country") +  # ggplot function
+  geom_boxplot()
+```
+
+```{r}
+# Visualization 4
+finalData3 <- finalData[s1p1c1lost<=1500+1.5*IQR(s1p1c1lost), ] 
+Country <- finalData3$adm0
+ggplot(finalData3, aes(x = Country, y = s1p1c1lost, color = Country)) + ggtitle("Productivity by Country") +  # ggplot function
+  geom_boxplot()
+```
+
+```{r}
+# Visualization 5
+#quantity harvested vs access to extension
+boxplot(s1p1c1qharv~extc ,data=finalData2,
+        xlab="Access to Extension", ylab="Quantity Harvested")
+```
+
+```{r}
+# Visualization 6
+#Productivity vs Farmtype
+
+boxplot(finalData2$productivity ~ finalData2$farmtype, dataset = finalData2,
+        xlab = "Farmtype",
+        ylab = "Productivity",
+        main = "Productivity by Farmtype (1:Small-scale; 2:Medium-scale; 3:Large-scale",
+        col=c("darkblue","red","green"))
+```
+
+```{r Quantity Harvest Distribution}
+# Visualization 7
+library(ggplot2)
+library(dplyr)
+
+ggplot(data=finalData, aes(s1p1c1qharv))+
+  geom_boxplot() +
+  coord_cartesian(xlim=c(0,10000)) +
+  ggtitle("Quantity Harvest Distribution")+
+  xlab("Quantity in Kilograms")+
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+```{r KDE for Quantity Harvested}
+# Visualization 8
+# Filtering out outliers (having value greater than 1.5*IQR)
+filtered_harv = finalData %>% filter(s1p1c1qharv <= IQR(s1p1c1qharv)*1.5)
+
+# Gaussian density estimate of normalized data
+ggplot(data = filtered_harv,aes(x=(s1p1c1qharv-mean(s1p1c1qharv))/sd(s1p1c1qharv))) +
+  stat_density(aes(fill=adm0),position="stack") +
+  guides(fill=guide_legend(title="Countries")) +
+  xlab("Quantity harvested (in kg(s))")+
+  ylab("Density")+
+  ggtitle("KDE of Quantity harvested")+
+  theme(plot.title = element_text(hjust=0.5))
+  
+```
+
+```{r  Percentage quantity consumed by household w.r.t occupation}
+# Visualization 9
+ 
+occupations = c("Farmer","Agricultural Labour","Artisan","Office Worker","Civil Servant","Teacher","Health Worker","Trader","Student","Unemployed","Non-labour","Other")
+
+filtered_harv %>%
+  group_by(hhhdocc1) %>%
+  mutate("percent_consumed" = (median(s1p1c1cons)*100)/median(s1p1c1qharv)) %>%
+  filter(hhhdocc1!=0) %>%
+  ggplot(aes(x=hhhdocc1,y=percent_consumed)) +
+  geom_col(position="identity",aes(fill=as.factor(hhhdocc1)))+
+  xlab("Occupation")+
+  ylab("Consumption %")+
+  ggtitle("Consumption percentage for different occupations") +
+  scale_x_continuous(labels=occupations,breaks=c(1:12)) +
+  theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
+
+```
+
+```{r Consumption percentage w.r.t household size}
+# Visualization 10
+filtered_harv %>%
+  group_by(hhsize) %>%
+  mutate("percent_consumed" = (median(s1p1c1cons)*100)/median(s1p1c1qharv)) %>%
+  ggplot(aes(x=hhsize,y=percent_consumed)) +
+  geom_point(position="identity") +
+  geom_smooth(se=FALSE)+
+  xlab("Number of persons in house")+
+  ylab("% Consumed")+
+  ggtitle("Consumption percentage for different household sizes")+
+  theme(plot.title = element_text(hjust=0.5))+
+  scale_x_continuous(breaks=seq(0,45,length.out=10))
+```
+
+```{r Quantity Harvest Vs Quantity sold}
+# Visualization 11
+# % Sold w.r.t harvested in relation to size of farm
+
+filtered_harv %>%
+  filter(s1p1c1sold <= 1.5*IQR(s1p1c1sold)) %>%
+  mutate(percent_sold = (s1p1c1sold*100)/s1p1c1qharv,
+         farmtype = as.factor(farmtype)) %>%
+  ggplot(aes(farmtype,percent_sold, fill=farmtype)) +
+  geom_violin()+
+  xlab("Size of farm")+
+  ylab("% Harvest sold")+
+  ggtitle("Selling percentage of harvest")+
+  theme(plot.title = element_text(hjust=0.5))+
+  guides(fill=guide_legend(title="Size"))+
+  scale_fill_discrete(labels = c("Small", "Medium", "Large"))+
+  coord_flip(ylim=c(-1,90))
+```
+
+```{r Quantity Harvest Vs Quantity sold with farmtype and hhsize}
+# Visualization 12
+# Lost with respect to q harvest
+filtered_harv %>%
+filter(s1p1c1lost < 1.5*IQR(s1p1c1lost)) %>%
+mutate(farmtype = factor(farmtype,labels=c("Small","Medium","Large"))) %>%
+mutate(s1p1c1qharv = scale(s1p1c1qharv), s1p1c1lost=scale(s1p1c1lost)) %>%
+ggplot(aes(x=s1p1c1qharv,y=s1p1c1lost))+
+geom_point(position = "jitter",alpha=0.5,aes(color=farmtype,size=hhsize))+
+coord_cartesian(xlim=c(-1,1),ylim=c(0,2))+
+xlab("Harvest")+
+ylab("Harvest Lost")+
+ggtitle("Loss percentage of harvest")+
+theme(plot.title = element_text(hjust=0.5))+
+labs(size="Persons in household",color="Size of farm")
+```
+
+```{r Quantity Harvest Vs Quantity sold with farmtype and hhelectric}
+# Visualization 13
+filtered_harv %>%
+filter(s1p1c1lost < 1.5*IQR(s1p1c1lost)) %>%
+mutate(farmtype = factor(farmtype,labels=c("Small","Medium","Large")),hhelectric=factor(hhelectric,labels=c("No","Yes","",""))) %>%
+mutate(s1p1c1qharv = scale(s1p1c1qharv), s1p1c1lost=scale(s1p1c1lost)) %>%
+filter(as.integer(hhelectric) %in% c(1,2)) %>%
+ggplot(aes(x=s1p1c1qharv,y=s1p1c1lost))+
+geom_point(position = "jitter",alpha=0.5,aes(color=hhelectric))+
+  facet_wrap(~farmtype) +
+  coord_cartesian(xlim=c(-1,1),ylim=c(-1,2))+
+  xlab("Harvest")+
+  ylab("Harvest lost")+
+  ggtitle("Selling percentage of harvest")+
+  labs(color="Has Electricity")+
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+
+# Theory Part
+
+```{r fig.align="center", echo=FALSE}
+knitr::include_graphics("1.jpg")
+knitr::include_graphics("2.jpg")
+knitr::include_graphics("3.jpg")
+```
+
+# R code
+
+```{r}
+xi <- c(2.1, 2.2, 2.3, 2.4, 2.6, 2.7, 3.2,3.3, 3.6, 3.7)
+n <- length(xi)
+x <- seq(from = min(xi) - 1, to = max(xi) + 1, length.out = 800)
+
+# Different values of h
+H <- c(0.1,0.3,0.5,0.8)
+gaussKDF <- function(x){1/sqrt(2*pi)*exp(-(x^2)/2)}
+UniformKDF <- function(x){dunif(x)}
+triangularKDF = function(x){(abs(x) < 1)*(1 - abs(x))}
+
+#using triangular kernel
+KDF<-triangularKDF
+
+plot_density = function(h,xi,x){
+  Dist_around_xis <- sapply(xi, function(xi){(1/(h*n))*KDF((x - xi)/h)})
+  hist(xi,freq = FALSE)
+  lines(x, apply(Dist_around_xis, 1, sum), type = "l", ylab = "", lwd = 2)
+  rug(xi, lwd = 2)
+  apply(Dist_around_xis, 2, function(z){lines(x, z)})
+}
+par(mfrow=c(2, 2))
+for(h in H){
+  plot_density(h,xi,x)
+}
+```
+
+### I created a function that plots the distribution of input data xi using a histogram. I then plotted the KDE of the same input on the same plot. For KDE, I used a triangular KDF. Further I created a function that takes input of different values of h to see, which h gives a fair estimate of the data. From visual inspection I can infer that h=0.3 gives the best estimate in comparison to the rest of the values. The rest of the values causes the estimator to be either extra smooth (large variance) or to be of extra variance
+
+### What is kernel estimation function?
+### It is a function that is used to find an estimate of the distribution of data. Histograms do a similar job however, the histogram's shapes changes with varying bin size and break points. Kernel estimation functions are used for a more generalized estimation of distribution of data using a continuous function rather than distinct partitions.

@@ -1,0 +1,161 @@
+---
+title: "STAT 5000 Module 2"
+author: "Shivam"
+date: "2022-10-02"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Assignment-2 Question-1, include=FALSE}
+#install.packages("gridExtra")
+library(gridExtra)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+# reading in data
+finalData = read_csv(file="A:\\DS-Stats-5000\\Project\\finalData.csv")
+
+#filtering data for extreme outliers
+filtered_sold = finalData %>% filter(s1p1c1sold <= IQR(s1p1c1sold)*1.5)
+filtered_harv = finalData %>% filter(s1p1c1qharv <= IQR(s1p1c1qharv)*1.5)
+
+# function for calculating the summary statistics
+stats = function(data,column){
+  column_data = data %>% pull(!!column)
+  mean = as.numeric(summary(column_data)["Mean"])
+  median = as.numeric(summary(column_data)["Median"])
+  mode_index = which.max(density(column_data)$y)
+  mode = density(column_data)$x[mode_index]
+  range = as.numeric(summary(column_data)["Max."]) - as.numeric(summary(column_data)["Min."])
+  q1 = as.numeric(summary(column_data)["1st Qu."])
+  q3 = as.numeric(summary(column_data)["3rd Qu."])
+  variance = var(column_data)
+  std_dev = sqrt(variance)
+  stats = c("Mean"=mean,"Median"=median,"Mode"=mode,"Range"=range,"q1"=q1,"q3"=q3,"variance"=variance,"std"=std_dev)
+  return(stats)
+}
+```
+  
+The statistic measures have been used inside the next section
+
+```{r question-2 variable: Quantity Harvested}
+
+histograms = function(data,column,n_bins){
+  column = enquo(column)
+  column_data = data %>% pull(!!column)
+  stats = stats(data,column)
+  print(paste("Mean:",as.numeric(as.character(stats["Mean"]))))
+  print(paste("Median:",as.numeric(as.character(stats["Median"]))))
+  print(paste("Mode:",as.numeric(as.character(stats["Mode"]))))
+  print(paste("Range:",as.numeric(as.character(stats["Range"]))))
+  print(paste("Frist Quartile:",as.numeric(as.character(stats["q1"]))))
+  print(paste("Third quartile:",as.numeric(as.character(stats["q3"]))))
+  print(paste("Varience:",as.numeric(as.character(stats["variance"]))))
+  print(paste("Standard Deviation:",as.numeric(as.character(stats["std"]))))
+  x_label = if(quo_name(column)=="s1p1c1qharv") "Quantity Harvest (in kg(s))" else "Quantity Sold (in kg(s))"
+  plt = ggplot(data=data)+
+    geom_histogram(aes(x=!!column),bins=n_bins,color="grey",fill="white")+
+    geom_vline(xintercept=as.numeric(as.character(stats["Mode"])),linetype="solid",color="red")+
+    geom_vline(xintercept=as.numeric(as.character(stats["Median"])),linetype="solid",color="blue")+
+    geom_vline(xintercept=as.numeric(as.character(stats["Mean"])),linetype="solid",color="green",size=1)+
+    annotate("text",x=as.numeric(as.character(stats["Mode"])),y=0,label="Mode")+
+    annotate("text",x=as.numeric(as.character(stats["Median"])),y=0,label="Median")+
+    annotate("text",x=as.numeric(as.character(stats["Mean"])),y=0,label="Mean")+
+    xlab(x_label)+
+    ylab("Frequency")+
+    ggtitle(cat("Histogram plot with ",n_bins," bins"))+
+    theme(plot.title = element_text(hjust=0.5))
+  return(plt)
+
+}
+
+plt1 = histograms(filtered_harv,s1p1c1qharv,10)
+plt2 = histograms(filtered_harv,s1p1c1qharv,15)
+plt3 = histograms(filtered_harv,s1p1c1qharv,20)
+grid.arrange(plt1,plt2,plt3,ncol=1,nrow=3)
+```
+  
+The summary statistics such as mean median mode converges with the histogram plots of the variables "Quantity Harvested"
+```{r question-2 variable: Quantity Sold}
+plt1 = histograms(filtered_sold,s1p1c1sold,10)
+plt2 = histograms(filtered_sold,s1p1c1sold,15)
+plt3 = histograms(filtered_sold,s1p1c1sold,20)
+grid.arrange(plt1,plt2,plt3,ncol=1,nrow=3)
+```
+  The summary statistics such as mean median mode converges with the histogram plots of the variables "Quantity Sold"
+
+```{r question3}
+boxes = function(data,column){
+  column = enquo(column)
+  column_data = data %>% pull(!!column)
+  stats = stats(data,column)
+  Min = as.numeric(summary(column_data)["Min."])
+  Max = as.numeric(summary(column_data)["Max."])
+  x_label = if(quo_name(column)=="s1p1c1qharv") "Quantity Harvest" else "Quantity Sold"
+  plt = ggplot(data=data)+
+    geom_boxplot(aes(x=column_data))+
+    geom_vline(xintercept=Min,linetype="solid",color="red")+
+    geom_vline(xintercept=as.numeric(as.character(stats["q1"])),linetype="solid",color="green")+
+    geom_vline(xintercept=as.numeric(as.character(stats["Median"])),linetype="solid",color="blue")+
+    geom_vline(xintercept=as.numeric(as.character(stats["q3"])),linetype="solid",color="green")+
+    geom_vline(xintercept=Max,linetype="solid",color="red")+
+    annotate("text",x=Min,y=-0.4,label="Min")+
+    annotate("text",x=as.numeric(as.character(stats["q1"])),y=-0.4,label="Q1")+
+    annotate("text",x=as.numeric(as.character(stats["Median"])),y=-0.4,label="Median")+
+    annotate("text",x=as.numeric(as.character(stats["q3"])),y=-0.4,label="Q3")+
+    annotate("text",x=Max,y=-0.4,label="Max")+
+    xlab(x_label)+
+    ggtitle(cat("Box plot for",x_label))+
+    theme(plot.title = element_text(hjust=0.5))
+  return(plt)
+
+}
+
+plt1 = boxes(filtered_harv,s1p1c1qharv)
+plt2 = boxes(filtered_sold,s1p1c1sold)
+grid.arrange(plt1,plt2, nrow=2,ncol=1)
+
+```
+  In the above plots, we can observe that there are outliers in both the features, Quantity Harvested and Quantity Sold.
+
+```{r question4.a Guassion Kernel}
+
+density_plots = function(data,column,kernel_choice){
+  column = enquo(column)
+  column_data = data %>% pull(!!column)
+  x_label = if(quo_name(column)=="s1p1c1qharv") "Quantity Harvest" else "Quantity Sold"
+  plot= ggplot(data = data,aes(x=(column_data-mean(column_data))/sd(column_data))) +
+  geom_density(position="stack",kernel = kernel_choice)+
+  guides(fill=guide_legend(title="Countries")) +
+  xlab(c(x_label," (in kg(s))"))+
+  ylab("Density")+
+  ggtitle(cat("KDE of", x_label))+
+  theme(plot.title = element_text(hjust=0.5))
+}
+
+plt1 = density_plots(filtered_sold,s1p1c1sold,"gaussian")
+plt2 = density_plots(filtered_harv,s1p1c1qharv,"gaussian")
+grid.arrange(plt1,plt2 ,nrow=2,ncol=1)
+
+```
+```{r Question4.b Triangular Kernel}
+plt1 = density_plots(filtered_sold,s1p1c1sold,"triangular")
+plt2 = density_plots(filtered_harv,s1p1c1qharv,"triangular")
+grid.arrange(plt1,plt2 ,nrow=2,ncol=1)
+```
+
+  Both the kernels gives us a similar distribution with a difference in the smoothness of the curve.
+
+```{r question 5}
+
+ggplot(data = filtered_harv) +
+  stat_qq(aes(sample=(s1p1c1qharv-mean(s1p1c1qharv))/sd(s1p1c1qharv)),position="identity",color='red')+
+  stat_qq(aes(sample=(s1p1c1sold-mean(s1p1c1sold))/sd(s1p1c1sold)),position="identity",color="blue") +
+  geom_abline(aes(slope = 1, intercept = 0), linetype = 2)+
+  coord_cartesian(xlim=c(0,3),ylim=c(0,3))
+```
+  Red Quantile-Quantile plot represents the feature "Quantity Harvested" and the blue represents "Quantity Sold". Both the features have a very similar quantile distribution, except for the fact that the red variable is shifted upwards.
