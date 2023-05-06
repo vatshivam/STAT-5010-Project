@@ -206,7 +206,6 @@ ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
 
 ############################################################
 
-#   1. What countries experience the highest rates of post-harvest loss?
 #   2. What sub-regions within countries experience the highest rate of food loss?
 #   3. What is the relationship between farm size and post-harvest losses?
 #   4. What is the relationship between household income and post-harvest losses?
@@ -217,5 +216,16 @@ ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
 #   9. What is the relationship between household size and post-harvest losses?
 #   10. Do heads of households with primary occupations other than farming experience more or less loss than farmers with farming as their primary occupation
 
+#   1. What countries experience the highest rates of post-harvest loss?
+final_data %>%
+  group_by(adm0) %>%
+  mutate("percent_lost" = (mean(s1p1c1lost+0.01)*100)/mean((s1p1c1qharv)+0.01)) %>%
+  ggplot(aes(x=adm0,y=percent_lost)) +
+  geom_col(position="identity",aes(fill=adm0))+
+  xlab("Country")+
+  ylab("Lost %")+
+  ggtitle("Lost percentage for different countries") +
+  # scale_x_continuous(labels=countries,breaks=c(1:12)) +
+  theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
 
 
