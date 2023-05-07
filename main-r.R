@@ -79,11 +79,39 @@ data[data$extc == 0,c('extc')] = mode(data$extc)
 data[data$pc1 == 0,c('pc1')] = mode(data$pc1)
 data[data$incnfarm > 100,c('incnfarm')] = 100
 
+get_bins = function(data,num_partitions){
+  # calculate the size of each partition
+  partition_size <- ceiling(length(data)/num_partitions)
+  # create a sequence of indices to divide the data into partitions
+  partition_indices <- seq(1, length(data), by = partition_size)
+  # add the last index if needed to ensure all data points are included
+  if (partition_indices[length(partition_indices)] != length(data)) {
+    partition_indices <- c(partition_indices, length(data))
+  }
+  data = sort(data)
+  names = c()
+  for (i in c(1:length(partition_indices)-1)){
+    names[i]=paste0(data[partition_indices[i]],'-',data[partition_indices[i+1]])
+  }
+  return (names)
+}
+
 # Binning categorical variables
-data$incnfarm = as.factor(ntile(data$incnfarm, n=10))
-data$hhsize = as.factor(ntile(data$hhsize, n=10))
-data$yearsuse1 = as.factor(ntile(data$yearsuse1, n=5))
-data$s1p1c1area = as.factor(ntile(data$yearsuse1, n=7))
+incnfarm_bins = get_bins(data$incnfarm, n=10)
+data$incnfarm = ntile(data$incnfarm, n=10)
+data$incnfarm = factor(data$incnfarm,labels=incnfarm_bins)
+
+hhsize_bins = get_bins(data$hhsize, n=5)
+data$hhsize = ntile(data$hhsize, n=5)
+data$hhsize = factor(data$hhsize,labels=hhsize_bins)
+
+yearsuse1_bins = get_bins(data$yearsuse1, n=5)
+data$yearsuse1 = ntile(data$yearsuse1, n=5)
+data$yearsuse1 = factor(data$yearsuse1,labels=yearsuse1_bins)
+
+s1p1c1area_bins = get_bins(data$s1p1c1area, n=7)
+data$s1p1c1area = ntile(data$s1p1c1area, n=7)
+data$s1p1c1area = factor(data$s1p1c1area,labels=s1p1c1area_bins)
 
 # converting categorical features into factor:
 occupations = c("Farmer","Agricultural Labour","Artisan","Office Worker","Civil Servant","Teacher","Health Worker","Trader","Student","Unemployed","Non-labour","Other")
@@ -95,23 +123,33 @@ data$extc = as.factor(data$extc)
 
 str(data)
 
+write.csv(data,"D:/STAT 5010/project/STAT-5010-project/clean_data.csv")
+
 ############# EDA ############
 
-# Examining distribution of target variable: harvest lost: s1p1c1lost
+# Target -> incfarm -> income from farming over last 12 months
+
+# Examining distribution of target variable
 # Removing outliers for neater visualizations:
-final_data = data %>% filter(s1p1c1lost <= IQR(s1p1c1lost)*1.5)
-ggplot(data=final_data)+
-  stat_density(aes(x=s1p1c1lost,fill=adm0),position='stack') +
+temp = data %>% filter(incfarm <= IQR(incfarm)*1.5)
+ggplot(data=temp)+
+  geom_histogram(aes(x=incfarm),fill='red',color='white') +
   guides(fill=guide_legend(title="Countries")) +
-  coord_cartesian(xlim=c(0,25),ylim=c(0,2))+
-  xlab("Harvest Lost (in kg(s))") +
+  xlab("Income from farming") +
   ylab("Density") +
-  ggtitle("KDE of lost harvest") +
+  ggtitle("Income Distribution") +
   theme(plot.title = element_text(hjust=0.5))
 
 # from the above visualization, we could infer that the target variable
-# is not following a normal distribution, which is not an essential condition
+# is not following a normal distribution and it is skewed to the right.
+# Having a normal distribution is not an essential condition
 # for performing ordinary least squares.
+
+ggplot(data=temp)+
+  geom_boxplot(aes(x=incfarm)) +
+  ggtitle("Income Distribution")+
+  xlab("Income")+
+  theme(plot.title = element_text(hjust=0.5))
 
 # Correlation matrix:
 correlation = round(cor(data[,numeric_features]),1)
@@ -120,57 +158,55 @@ ggcorrplot(correlation)
 # High correlation pairs
 # plot area-quantity harvested
 # plot area-quantity sold
-# saleValue - plotarea
-# saleValue-quantity sold
-# saleValue-quantity harvested
+# saleValue-farm income
 # quantityharvested-quantitysold
 
-# Quantity Harvest Distribution
+# s1p1c1qharv
 filtered_harv = data %>% filter(s1p1c1qharv <= IQR(s1p1c1qharv)*1.5)
-
-ggplot(data=data, aes(s1p1c1qharv))+
-  geom_boxplot() +
-  coord_cartesian(xlim=c(0,10000)) +
-  ggtitle("Quantity Harvest Distribution")+
-  xlab("Quantity in Kilograms")+
+ggplot(data=filtered_harv)+
+  stat_density(aes(x=s1p1c1qharv,fill=adm0)) +
+  guides(fill=guide_legend(title="Countries")) +
+  xlab("Quantity harvested") +
+  ylab("Density") +
+  ggtitle("KDE of harvest") +
   theme(plot.title = element_text(hjust=0.5))
 
-ggplot(data = filtered_harv,aes(x=(s1p1c1qharv-mean(s1p1c1qharv))/sd(s1p1c1qharv))) +
-  stat_density(aes(fill=adm0),position="stack") +
-  guides(fill=guide_legend(title="Countries")) +
-  xlab("Quantity harvested (in kg(s))")+
+# farmsalev
+temp = data %>% filter(farmsalev <= IQR(farmsalev)*1.5)
+ggplot(data = temp,aes(x=farmsalev)) +
+  geom_histogram(fill='green',color='white') +
+  xlab("Selling Value")+
   ylab("Density")+
-  ggtitle("KDE of Quantity harvested")+
+  ggtitle("Selling value distribution")+
   theme(plot.title = element_text(hjust=0.5))
 
 # Quantity Sold Distribution
-
 filtered_sold = data %>% filter(s1p1c1sold <= IQR(s1p1c1sold)*1.5)
 ggplot(data = filtered_sold,aes(x=(s1p1c1sold-mean(s1p1c1sold))/sd(s1p1c1sold))) +
   stat_density(aes(fill=adm0),position="stack") +
   guides(fill=guide_legend(title="Countries")) +
-  xlab("Quantity harvested (in kg(s))")+
+  xlab("Quantity Sold (in kg(s))")+
   ylab("Density")+
-  ggtitle("KDE of Quantity harvested")+
+  ggtitle("KDE of Quantity Sold")+
   theme(plot.title = element_text(hjust=0.5))
 
+######### Multivariate Analysis ##############
 
-# Percentage quantity consumed by household w.r.t occupation
+# Income Vs. occupation
 occupations = c("Farmer","Agricultural Labour","Artisan","Office Worker","Civil Servant","Teacher","Health Worker","Trader","Student","Unemployed","Non-labour","Other")
-filtered_harv %>%
+data %>% filter(incfarm <= IQR(incfarm)*1.5) %>%
   group_by(as.numeric(hhhdocc1)) %>%
-  mutate("percent_consumed" = (median(s1p1c1cons)*100)/median(s1p1c1qharv)) %>%
+  mutate("median_sales" = median(incfarm)) %>%
   filter(hhhdocc1!=0) %>%
-  ggplot(aes(x=as.numeric(hhhdocc1),y=percent_consumed)) +
+  ggplot(aes(x=as.numeric(hhhdocc1),y=median_sales)) +
   geom_col(position="identity",aes(fill=hhhdocc1))+
   xlab("Occupation")+
-  ylab("Consumption %")+
-  ggtitle("Consumption percentage for different occupations") +
+  ylab("Median Sales")+
+  ggtitle("Sale value for different occupations") +
   scale_x_continuous(labels=occupations,breaks=c(1:12)) +
   theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
 
 # Harvest lost wrt to occupation
-
 filtered_harv %>%
   group_by(as.numeric(hhhdocc1)) %>%
   filter(hhhdocc1!=0) %>%
