@@ -4,6 +4,9 @@ library(ggplot2)
 library(plotrix)
 library(ggcorrplot)
 
+############# Data Cleaning ############
+
+
 # Extract key variables for analysis
 data = read.csv('D:/STAT 5010/project/STAT-5010-project/data.csv')
 data = data[,c('farmtype', 'hhsize', 'hhelectric', 'hhhdocc1', 'fplotarea1', 'yearsuse1', 'farmsalev', 's1p1c1area','s1p1c1qharv', 's1p1c1cons', 's1p1c1lives', 's1p1c1lost', 's1p1c1sold', 'pc1', 'extc', 'adm0',  'adm1', 'incfarm','incnfarm')]
@@ -17,27 +20,46 @@ summary(data)
 # Datatype information
 str(data)
 
-#determines the number of NAs in each column before cleaning
-temp = data.frame(colSums(is.na(data)))
+# Unique values in each column
+unique_val = sapply(data, function(x) n_distinct(x))
+temp = data.frame(unique_val)
 ggplot(data=temp)+
-  geom_col(aes(y=colSums(is.na(data)),x=row.names(temp)))+
+  geom_col(aes(y=unique_val,x=row.names(temp),fill=row.names(temp)))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),plot.title = element_text(hjust=0.5))+
+  ggtitle("Unique values in each column")+
+  xlab("Columns")+
+  ylab("Count")+
+  scale_fill_discrete(name = "Columns")
+
+# Features having more than 500 unique values categorized as quantitative 
+numeric_features = c('fplotarea1','farmsalev','s1p1c1qharv','s1p1c1sold','incfarm')
+categorical_features = c('farmtype','hhelectric','hhhdocc1','extc','adm1',
+                         'adm0','incnfarm','s1p1c1lives','s1p1c1lost',
+                         'hhsize','yearsuse1','s1p1c1area','s1p1c1cons','pc1')
+
+# Number of NAs in each column
+temp = data.frame(round(colSums(is.na(data))*100/nrow(data),2))
+ggplot(data=temp)+
+  geom_col(aes(fill=row.names(temp),y=round(colSums(is.na(data))*100/nrow(data),2),x=row.names(temp)))+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),plot.title = element_text(hjust=0.5))+
   ggtitle("Null values in each column")+
   xlab("Columns")+
-  ylab("Count")
+  ylab("Percent")+
+  scale_fill_discrete(name = "Columns")
 
-# Remove NAs associated with the target variable that is harvest loss (s1p1c1lost).
-data = data[complete.cases(data[,c("s1p1c1lost")]),] #removes all rows that contain no loss data
+# s1p1c1lives: Amount consumed by livestock
+# s1p1c1lost: Amount lost
 
-temp = data.frame(colSums(is.na(data)))
-ggplot(data=temp)+
-  geom_col(aes(y=colSums(is.na(data)),x=row.names(temp)))+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),plot.title = element_text(hjust=0.5))+
-  ggtitle("Null values in each column")+
-  xlab("Columns")+
-  ylab("Count")
+# Dropping qualitative columns with more than 30% null values:
+data = subset(data, select = -c(s1p1c1lost,s1p1c1lives,s1p1c1cons))
+categorical_features = categorical_features[categorical_features %in% c("s1p1c1lives", "s1p1c1lost","s1p1c1cons") == FALSE]
 
-# Additionally, we remove any variables that have NAs from categorical which are less than 10% of the total number of  observations (~9500) 
+# Remove NAs from rest of the columns
+cols = c(categorical_features,numeric_features)
+data = data[complete.cases(data[,cols]),]
+
+# No null values left
+colSums(is.na(data))
 
 # farmtype: small, medium, large - ordinal
 # extc: binary
@@ -45,34 +67,35 @@ ggplot(data=temp)+
 # hhelectric: Has electricity or not: binary
 # hhhdocc1: Occupation of interviewee: categorical
 # adm0/adm1: Country name
+# incnfarm: % income from non farm activities
+# hhsize: household size
+# yearsuse1: Number of years for which the land is used
 
-# Delete rows with null values of qualitative variables
-data = data[complete.cases(data[,c("farmtype", "hhelectric", "hhhdocc1", "pc1", "extc", "adm0", "adm1")]),] #removes rows with NAs for categorical variables with <10% NAs 
+# Removing incorrect values from variables using survey manual
+mode<-function(x){which.max(tabulate(x))}
+data[data$hhelectric == 0,c('hhelectric')] = mode(data$hhelectric)
+data[data$hhhdocc1 == 0,c('hhhdocc1')] = mode(data$hhhdocc1)
+data[data$extc == 0,c('extc')] = mode(data$extc)
+data[data$pc1 == 0,c('pc1')] = mode(data$pc1)
+data[data$incnfarm > 100,c('incnfarm')] = 100
 
-table(data$hhelectric)
+# Binning categorical variables
+data$incnfarm = as.factor(ntile(data$incnfarm, n=10))
+data$hhsize = as.factor(ntile(data$hhsize, n=10))
+data$yearsuse1 = as.factor(ntile(data$yearsuse1, n=5))
+data$s1p1c1area = as.factor(ntile(data$yearsuse1, n=7))
 
-# Removing incorrect values other than 1 and 2
-data[data$hhelectric == 0,c('hhelectric')] = 2
-data[data$hhelectric == 3,c('hhelectric')] = 2
-
-# Imputing null values in quantitative features using mean with respect to the country.
-data = data %>% 
-  group_by('cleanData2$adm0') %>% 
-  mutate_at(vars('hhsize', 'yearsuse1', 'farmsalev','s1p1c1area', 's1p1c1qharv', 's1p1c1cons', 's1p1c1lives', 's1p1c1sold', 'incfarm', 'incnfarm'), ~replace_na(., median(., na.rm = TRUE)))
-finalNaCount = colSums(is.na(data)) #recounts the number of NAs in each column
-print(finalNaCount)
+# converting categorical features into factor:
+occupations = c("Farmer","Agricultural Labour","Artisan","Office Worker","Civil Servant","Teacher","Health Worker","Trader","Student","Unemployed","Non-labour","Other")
+data$farmtype = factor(data$farmtype,labels=c("Small","Medium","Large"))
+data$hhelectric = factor(data$hhelectric,labels=c("Yes","No"))
+data$hhhdocc1 = factor(data$hhhdocc1,labels=occupations)
+data$pc1 = as.factor(data$pc1)
+data$extc = as.factor(data$extc)
 
 str(data)
 
-numeric_features = c('s1p1c1lost','hhsize','fplotarea1','yearsuse1','farmsalev','s1p1c1area','s1p1c1qharv','s1p1c1cons','s1p1c1lives','s1p1c1sold','incfarm','incnfarm')
-categorical_features = c('farmtype','hhelectric','hhhdocc1','extc','adm0')
-
-# converting categorical features into factor:
-data$farmtype = factor(data$farmtype,labels=c("Small","Medium","Large"))
-data$hhelectric = factor(data$hhelectric,labels=c("Yes","No"))
-data$hhhdocc1 = as.factor(data$hhhdocc1)
-data$pc1 = as.factor(data$pc1)
-data$extc = as.factor(data$extc)
+############# EDA ############
 
 # Examining distribution of target variable: harvest lost: s1p1c1lost
 # Removing outliers for neater visualizations:
@@ -165,7 +188,7 @@ filtered_harv %>%
 
 ggplot(data=final_data,aes(x=s1p1c1sold,y=s1p1c1lost))+
   geom_point(position = "jitter",alpha=0.5,aes(color=farmtype))+
-  coord_cartesian(xlim=c(0,500),ylim=c(0,200))+
+  coord_cartesian(xlim=c(0,500),ylim=c(0,30))+
   xlab("Quantity Sold")+
   ylab("Quantity Lost")+
   ggtitle("Harvest Lost vs Sold with farm types")+
@@ -182,17 +205,6 @@ ggplot(data=final_data,aes(x=s1p1c1lost,y=s1p1c1qharv))+
   theme(plot.title = element_text(hjust=0.5))+
   labs(color="Has Electricity")
 
-# harvest lost vs income
-
-ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
-  geom_point(position = "jitter",alpha=0.5,aes(color=hhelectric))+
-  coord_cartesian(xlim=c(0,50),ylim=c(0,100000))+
-  xlab("Harvest Lost")+
-  ylab("Income")+
-  ggtitle("Income vs Harvest Lost")+
-  theme(plot.title = element_text(hjust=0.5))+
-  labs(color="Has Electricity")
-
 # harvest lost vs consumed
 
 ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
@@ -206,8 +218,6 @@ ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
 
 ############################################################
 
-#   2. What sub-regions within countries experience the highest rate of food loss?
-#   3. What is the relationship between farm size and post-harvest losses?
 #   4. What is the relationship between household income and post-harvest losses?
 #   5. What is the relationship between farm productivity and post-harvest losses?
 #   6. What is the relationship between household income and farm productivity?
@@ -228,4 +238,23 @@ final_data %>%
   # scale_x_continuous(labels=countries,breaks=c(1:12)) +
   theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
 
+# 2. What is the relationship between farm size and post-harvest losses?
+ggplot(data=final_data,aes(x=s1p1c1sold,y=s1p1c1lost))+
+  geom_point(position = "jitter",alpha=0.5,aes(color=farmtype))+
+  coord_cartesian(xlim=c(0,500),ylim=c(0,30))+
+  xlab("Quantity Sold")+
+  ylab("Quantity Lost")+
+  ggtitle("Harvest Lost vs Sold with farm types")+
+  theme(plot.title = element_text(hjust=0.5))+
+  labs(color="Size of farm")
 
+# 3. What is the relationship between household income and post-harvest losses?
+
+ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
+  geom_point(position = "jitter",alpha=0.5,aes(color=hhelectric))+
+  coord_cartesian(xlim=c(0,30),ylim=c(0,100000))+
+  xlab("Harvest Lost")+
+  ylab("Income")+
+  ggtitle("Income vs Harvest Lost")+
+  theme(plot.title = element_text(hjust=0.5))+
+  labs(color="Has Electricity")
