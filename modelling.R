@@ -7,7 +7,7 @@ library(caret)
 
 # data<-read.csv("~/Documents/Github/STAT-5010-Project/clean_data.csv")
 # saveRDS and readRDS function saves the datatype information as well, unlike read.csv 
-data<-readRDS(file="D:/STAT 5010/project/STAT-5010-project/clean_data.rds")
+data<-readRDS(file="./clean_data.rds")
 
 head(data)
 
@@ -53,12 +53,8 @@ str(data)
 lm_full = lm(incfarm ~ .,data=data)
 summary(lm_full)
 
-# Ansh's original code
 
-lm_model <- lm(incfarm ~ farmtype + hhsize + hhelectric + hhhdocc1 + fplotarea1 + 
-                 yearsuse1 + farmsalev + s1p1c1area + s1p1c1qharv + pc1+ s1p1c1sold, data = data)
 
-summary(lm_model)
 
 # From Variance inflation factor we can see that the s1p1c1sold has vif value greater than 5
 # which indicates high multicollinearity.
@@ -68,11 +64,13 @@ ggplot(data,aes(x=farmsalev,y=incfarm))+
 # Here the relationship looks linear between incfarm and farmsalev
 
 # Now to check the significance of the predictors we will proceed with performing t-test and ANOVA
+str(data)
+anova(lm_full)
 
-anova(lm_model)
-
-reduced_model <-lm(incfarm ~  hhsize + fplotarea1 + 
-                 farmsalev +  s1p1c1qharv + pc1+ s1p1c1sold, data = data)
+reduced_model <-lm(incfarm ~  `hhsize4-6`+`hhsize6-7`+`hhsize7-8` +`s1p1c1area20-35.20999908`+
+                   `incnfarm0-0.1000000015`+`incnfarm0.1000000015-0.5` +`incnfarm0.5-5`+`incnfarm5-20`
+                    + fplotarea1 + farmsalev + `incnfarm35-52`+ `incnfarm52-80`+
+                     s1p1c1qharv + s1p1c1sold, data = data)
 
 summary(reduced_model)
 anova(reduced_model)
@@ -80,23 +78,35 @@ anova(reduced_model)
 vif(reduced_model)
 # From vif values we can see that s1p1c1sold is having value greater than 5 which suggests
 # multicollinearity
-uptd_reduced_model <-lm(incfarm ~  hhsize + fplotarea1 + 
-                     farmsalev +  s1p1c1qharv + pc1, data = data)
+uptd_reduced_model <-lm(incfarm ~  `hhsize4-6`+`hhsize6-7`+`hhsize7-8` +`s1p1c1area20-35.20999908`+
+                     `incnfarm0-0.1000000015`+`incnfarm0.1000000015-0.5` +`incnfarm0.5-5`+`incnfarm5-20`
+                   + fplotarea1 + farmsalev + `incnfarm35-52`+ `incnfarm52-80`+
+                     s1p1c1qharv , data = data)
 
 summary(uptd_reduced_model)
 anova(uptd_reduced_model)
 
 vif(uptd_reduced_model)
 
+final_reduced_model <-lm(incfarm ~  `hhsize4-6`+`hhsize6-7` +
+                          `incnfarm0-0.1000000015`+`incnfarm0.1000000015-0.5` +`incnfarm0.5-5`+`incnfarm5-20`
+                        + fplotarea1 + farmsalev + `incnfarm35-52`+
+                          s1p1c1qharv , data = data)
+
+summary(final_reduced_model)
+anova(final_reduced_model)
+
 
 
 
              
 
-data.red_model = data.frame(yhat = fitted(uptd_reduced_model), r = resid(uptd_reduced_model), y =data$incfarm,
-                            hhsize =data$hhsize,fplotarea1 = data$fplotarea1,
-                            farmsalev = data$farmsalev, s1p1c1qharv=data$s1p1c1qharv,
-                            pc1=data$pc1, s1p1c1sold=data$s1p1c1sold
+data.red_model = data.frame(yhat = fitted(final_reduced_model), r = resid(final_reduced_model), y =data$incfarm,
+                            `hhsize4-6`=data$`hhsize4-6`,`hhsize6-7`=data$`hhsize6-7`,
+                            `incnfarm0-0.1000000015` = data$`incnfarm0-0.1000000015`,
+                            `incnfarm0.1000000015-0.5` = data$`incnfarm0.1000000015-0.5`, 
+                            `incnfarm0.5-5`=data$`incnfarm0.5-5`,`incnfarm5-20`=data$`incnfarm5-20`,
+                            s1p1c1qharv=data$s1p1c1qharv
                          )
 head(data.red_model)
 
@@ -115,37 +125,26 @@ ggplot(data.red_model, aes(x = yhat, y = y)) +
   labs(x = "Fitted Values", y = "Observed Values", title = "Fitted vs Observed Plot") 
 
 
-# Using transformation to improve the linear model performance
-
-#hhsize + fplotarea1 + farmsalev +  s1p1c1qharv + pc1
-new_data<-data
-
-
-new_data$sqrtfplotarea1<- sqrt(data$fplotarea1)
-new_data$sqrtfarmsalev <- sqrt(data$farmsalev)
-new_data$sqrts1p1c1qharv <- sqrt(data$s1p1c1qharv)
-new_data$sqrtpc1 <- sqrt(data$pc1)
-
-
-sqrt_red_model <- lm(incfarm ~ sqrtfplotarea1 + sqrtfarmsalev + sqrts1p1c1qharv + 
-                      sqrtpc1 + hhsize, data = new_data)
-
-
-summary(sqrt_red_model)
-
-
 # Backward Selection
 
 
-backward_model <- step(lm_model, direction = "backward", k = log(nrow(data)))
+backward_model <- step(lm_full, direction = "backward", k = log(nrow(data)))
 
 summary(backward_model)
 
 # Forward Selection
 
-forward_model <- regsubsets(incfarm ~ farmtype + hhsize + hhelectric + hhhdocc1 + fplotarea1 + 
-                      yearsuse1 + farmsalev + s1p1c1area + s1p1c1qharv + pc1+ s1p1c1sold, 
-                    data = data, 
+str(data)
+
+forward_model <- regsubsets(incfarm ~ fplotarea1+ farmsalev + s1p1c1qharv + 
+                              s1p1c1sold + incfarm + `hhsize1-4`+ `hhsize4-6`
+                            +`hhsize6-7`+ `hhsize7-8`+`hhsize8-48`+ 
+                              hhelectricYes+ hhelectricNo + `s1p1c1area0-20`+
+                              `s1p1c1area20-35.20999908`+ `s1p1c1area35.20999908-50`
+                            +`s1p1c1area50-60`+ `s1p1c1area60-80`+ `s1p1c1area80-100`
+                            + `s1p1c1area100-100`+`incnfarm0-0`+ `incnfarm0-0.1000000015`
+                            + `incnfarm0.5-5`+ `incnfarm20-35`+ `incnfarm5-20`
+                            + `incnfarm35-52`+ `incnfarm52-80`+ `incnfarm80-100`, data = data, 
                     method = "forward")
 
 
@@ -153,3 +152,96 @@ summary(forward_model, scale = "bic")
 
 # Print the coefficients of the model with the lowest BIC
 coef(forward_model, id = which.min(summary(forward_model)$bic))
+
+forward_selected_model <- lm(incfarm~ fplotarea1+ farmsalev+ s1p1c1sold + `hhsize6-7` +`incnfarm20-35`
+                  +`incnfarm80-100` + `hhsize8-48`, data=data)
+
+summary(forward_selected_model)
+
+n = dim(data)[1]; 
+reg1 = regsubsets(incfarm ~ fplotarea1+ farmsalev + s1p1c1qharv + 
+                    s1p1c1sold + incfarm + `hhsize1-4`+ `hhsize4-6`
+                  +`hhsize6-7`+ `hhsize7-8`+`hhsize8-48`+ 
+                    hhelectricYes+ hhelectricNo + `s1p1c1area0-20`+
+                    `s1p1c1area20-35.20999908`+ `s1p1c1area35.20999908-50`
+                  +`s1p1c1area50-60`+ `s1p1c1area60-80`+ `s1p1c1area80-100`
+                  + `s1p1c1area100-100`+`incnfarm0-0`+ `incnfarm0-0.1000000015`
+                  + `incnfarm0.5-5`+ `incnfarm20-35`+ `incnfarm5-20`
+                  + `incnfarm35-52`+ `incnfarm52-80`+ `incnfarm80-100`, data = data)
+rs = summary(reg1)
+rs$which
+
+
+# Transformation on the best model
+
+new_data<-data
+
+
+new_data$sqrtfplotarea1<- sqrt(data$fplotarea1)
+new_data$sqrtfarmsalev <- sqrt(data$farmsalev)
+new_data$sqrts1p1c1qharv <- sqrt(data$s1p1c1sold)
+
+
+
+sqrt_red_model <- lm(incfarm ~ sqrtfplotarea1 + sqrtfarmsalev + s1p1c1sold + 
+                       `hhsize6-7` +
+                     +`incnfarm80-100`, data = new_data)
+
+
+summary(sqrt_red_model)
+vif(sqrt_red_model)
+anova(sqrt_red_model)
+
+data.final_red_model = data.frame(yhat = fitted(sqrt_red_model), r = resid(sqrt_red_model), y =new_data$incfarm,
+                            `hhsize6-7`=new_data$`hhsize6-7`,
+                            s1p1c1sold=new_data$s1p1c1sold,
+                            sqrtfplotarea1=new_data$sqrtfplotarea1, 
+                            sqrtfarmsalev=new_data$sqrtfarmsalev,
+                            `incnfarm80-100` = new_data$`incnfarm80-100`
+)
+head(data.final_red_model)
+
+
+ggplot(data=as.data.frame(new_data))+
+  geom_point(aes(x=fitted(sqrt_red_model),y=resid(sqrt_red_model)))+
+  ggtitle("Residuals vs Fitted")+
+  xlab("Predicted")+
+  ylab("Residuals")+
+  theme(plot.title = element_text(hjust=0.5))+
+  geom_smooth(aes(x=fitted(sqrt_red_model),y=resid(sqrt_red_model)),se=FALSE)+
+  geom_hline(yintercept=0)
+
+
+ggplot(data=as.data.frame(new_data),aes(sample=resid(sqrt_red_model)))+
+  stat_qq() +
+  stat_qq_line()+
+  ggtitle("QQ plot for Residuals")+
+  theme(plot.title = element_text(hjust=0.5))
+
+ggplot(data=as.data.frame(new_data))+
+  geom_point(aes(x=incfarm,y=fitted(sqrt_red_model)),alpha=0.5,position="jitter")+
+  ggtitle("Fitted vs Observed")+
+  xlab("Observed")+
+  ylab("Predicted")+
+  theme(plot.title = element_text(hjust=0.5))+
+  geom_smooth(aes(x=incfarm,y=fitted(sqrt_red_model)),se=FALSE,color='red')+
+  geom_abline(slope=1,intercept = 0,color='black',linewidth=1)
+
+n = dim(as.data.frame(new_data))[1]; 
+x = head(resid(sqrt_red_model), n-1)
+y = tail(resid(sqrt_red_model), n-1)
+srp = data.frame(x,y)
+
+ggplot(srp, aes(x = x, y = y)) + 
+  geom_point() + 
+  geom_vline(xintercept = 0) + 
+  geom_hline(yintercept = 0) + 
+  geom_smooth(aes(x=x,y=y),se=F) +
+  xlab(expression(hat(epsilon)[i])) +
+  ylab(expression(hat(epsilon)[i+1])) + 
+  ggtitle("Successive Residual Plot") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.7))
+
+
+
