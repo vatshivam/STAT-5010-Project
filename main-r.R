@@ -191,106 +191,63 @@ ggplot(data = filtered_sold,aes(x=(s1p1c1sold-mean(s1p1c1sold))/sd(s1p1c1sold)))
   theme(plot.title = element_text(hjust=0.5))
 
 ######### Multivariate Analysis ##############
+##############################################
 
-# Income Vs. occupation
-occupations = c("Farmer","Agricultural Labour","Artisan","Office Worker","Civil Servant","Teacher","Health Worker","Trader","Student","Unemployed","Non-labour","Other")
-data %>% filter(incfarm <= IQR(incfarm)*1.5) %>%
-  group_by(as.numeric(hhhdocc1)) %>%
-  mutate("median_sales" = median(incfarm)) %>%
-  filter(hhhdocc1!=0) %>%
-  ggplot(aes(x=as.numeric(hhhdocc1),y=median_sales)) +
-  geom_col(position="identity",aes(fill=hhhdocc1))+
-  xlab("Occupation")+
-  ylab("Median Sales")+
-  ggtitle("Sale value for different occupations") +
-  scale_x_continuous(labels=occupations,breaks=c(1:12)) +
-  theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
-
-# Harvest lost wrt to occupation
-filtered_harv %>%
-  group_by(as.numeric(hhhdocc1)) %>%
-  filter(hhhdocc1!=0) %>%
-  ggplot(aes(x=as.numeric(hhhdocc1),y=s1p1c1lost)) +
-  geom_col(position="identity",aes(fill=hhhdocc1))+
-  xlab("Occupation")+
-  ylab("Quantity Sold")+
-  ggtitle("Quantity sold Vs. occupations") +
-  scale_x_continuous(labels=occupations,breaks=c(1:12)) +
-  coord_cartesian(ylim=c(0,50000)) +
-  theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
-
-# scatter plot:
-# harvest lost vs quantity sold
-
-ggplot(data=final_data,aes(x=s1p1c1sold,y=s1p1c1lost))+
-  geom_point(position = "jitter",alpha=0.5,aes(color=farmtype))+
-  coord_cartesian(xlim=c(0,500),ylim=c(0,30))+
-  xlab("Quantity Sold")+
-  ylab("Quantity Lost")+
-  ggtitle("Harvest Lost vs Sold with farm types")+
-  theme(plot.title = element_text(hjust=0.5))+
-  labs(color="Size of farm")
-
-# harvest lost vs quantity harvested
-ggplot(data=final_data,aes(x=s1p1c1lost,y=s1p1c1qharv))+
-  geom_point(position = "jitter",alpha=0.5,aes(color=hhelectric))+
-  coord_cartesian(xlim=c(0,35),ylim=c(0,40000))+
-  xlab("Harvest Lost")+
-  ylab("Quantity Harvest")+
-  ggtitle("Lost vs Harvested")+
-  theme(plot.title = element_text(hjust=0.5))+
-  labs(color="Has Electricity")
-
-# harvest lost vs consumed
-
-ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
-  geom_point(position = "jitter",alpha=0.5,aes(color=hhelectric))+
-  coord_cartesian(xlim=c(0,30),ylim=c(0,100000))+
-  xlab("Harvest Lost")+
-  ylab("Income")+
-  ggtitle("Income vs Harvest Lost")+
-  theme(plot.title = element_text(hjust=0.5))+
-  labs(color="Has Electricity")
-
-############################################################
-
-#   4. What is the relationship between household income and post-harvest losses?
-#   5. What is the relationship between farm productivity and post-harvest losses?
-#   6. What is the relationship between household income and farm productivity?
-#   7. Do farmers with access to extension services experience less post-harvest losses?
-#   8. Which crops are most prone to post-harvest losses?
-#   9. What is the relationship between household size and post-harvest losses?
-#   10. Do heads of households with primary occupations other than farming experience more or less loss than farmers with farming as their primary occupation
-
-#   1. What countries experience the highest rates of post-harvest loss?
-final_data %>%
+#   1. What countries experience the highest rates of income?
+data %>%
   group_by(adm0) %>%
-  mutate("percent_lost" = (mean(s1p1c1lost+0.01)*100)/mean((s1p1c1qharv)+0.01)) %>%
-  ggplot(aes(x=adm0,y=percent_lost)) +
+  mutate("income" = median(incfarm)) %>%
+  ggplot(aes(x=adm0,y=income)) +
   geom_col(position="identity",aes(fill=adm0))+
   xlab("Country")+
-  ylab("Lost %")+
-  ggtitle("Lost percentage for different countries") +
+  ylab("Income")+
+  ggtitle("Income for different countries") +
   # scale_x_continuous(labels=countries,breaks=c(1:12)) +
   theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
 
-# 2. What is the relationship between farm size and post-harvest losses?
-ggplot(data=final_data,aes(x=s1p1c1sold,y=s1p1c1lost))+
+# 2. What is the relationship between farm size and income generated?
+temp = data %>% filter(incfarm <= IQR(incfarm)*1.5)
+ggplot(data=temp,aes(x=incfarm,y=s1p1c1qharv))+
   geom_point(position = "jitter",alpha=0.5,aes(color=farmtype))+
-  coord_cartesian(xlim=c(0,500),ylim=c(0,30))+
-  xlab("Quantity Sold")+
-  ylab("Quantity Lost")+
-  ggtitle("Harvest Lost vs Sold with farm types")+
+  coord_cartesian(xlim=c(0,750000),ylim=c(0,10000))+
+  xlab("Income")+
+  ylab("Quantity Harvested")+
+  ggtitle("Harvest vs Income")+
   theme(plot.title = element_text(hjust=0.5))+
   labs(color="Size of farm")
 
-# 3. What is the relationship between household income and post-harvest losses?
+# 3. What is the relationship between household income and occupation of family head?
 
-ggplot(data=final_data,aes(x=s1p1c1lost,y=incfarm))+
+occupations = c("Farmer","Agricultural Labour","Artisan","Office Worker","Civil Servant","Teacher","Health Worker","Trader","Student","Unemployed","Non-labour","Other")
+data %>% filter(incfarm <= IQR(incfarm)*1.5) %>%
+  group_by(as.numeric(hhhdocc1)) %>%
+  mutate("median_inc" = median(incfarm)) %>%
+  filter(hhhdocc1!=0) %>%
+  ggplot(aes(x=as.numeric(hhhdocc1),y=median_inc)) +
+  geom_col(position="identity",aes(fill=hhhdocc1))+
+  xlab("Occupation")+
+  ylab("Median Income")+
+  ggtitle("Income value for different occupations") +
+  scale_x_continuous(labels=occupations,breaks=c(1:12)) +
+  theme(plot.title = element_text(hjust=0.5),axis.text.x = element_text(angle=30,face="bold",vjust=0.8),legend.position = "none")
+
+# 4. What is the relationship between income and quantity sold with respect to electricity
+ggplot(data=temp,aes(x=incfarm,y=s1p1c1sold))+
   geom_point(position = "jitter",alpha=0.5,aes(color=hhelectric))+
-  coord_cartesian(xlim=c(0,30),ylim=c(0,100000))+
-  xlab("Harvest Lost")+
-  ylab("Income")+
-  ggtitle("Income vs Harvest Lost")+
+  coord_cartesian(xlim=c(0,500000),ylim=c(0,10000))+
+  xlab("Income")+
+  ylab("Quantity Sold")+
+  ggtitle("Harvest vs Income")+
   theme(plot.title = element_text(hjust=0.5))+
   labs(color="Has Electricity")
+
+# 5. What is the relationship between income and farm's market value with respect to electricity and farm size:
+ggplot(data=temp,aes(x=incfarm,y=farmsalev))+
+  geom_point(position = "jitter",alpha=0.5,aes(color=hhelectric))+
+  coord_cartesian(xlim=c(0,500000),ylim=c(0,10^5))+
+  facet_grid(.~farmtype)+
+  xlab("Income")+
+  ylab("Sale value")+
+  ggtitle("SaleValue vs Income")+
+  theme(plot.title = element_text(hjust=0.5))+
+  labs(color="Has electricity")
