@@ -184,47 +184,26 @@ reg1 = regsubsets(incfarm ~ fplotarea1+ farmsalev + s1p1c1qharv +
 rs = summary(reg1)
 rs$which
 
+mspe_array = list()
 for(i in c(1:9)){
   models = rs$which[i,-1]
   predictors = names(which(models == TRUE))
-}
-
-predictors
-
-predictors <- lapply(predictors, function(x) gsub("1$", "", x))
-
-predictors[1] <- "fplotarea1"
-
-my_list <- list("fplotarea1", "farmsalev", "s1p1c1sold", "`hhsize6-7`","`s1p1c1area100-100`",
-                "`incnfarm0-0`", "`incnfarm20-35`", "`incnfarm5-20`", "`incnfarm35-52`")
-my_vector <- unlist(my_list)
-
-
-predictors_transformed <- paste(my_vector, collapse = "+")
-
-
-input_column = append("incfarm",my_vector)
-
-compute_mspe = function(train,test,rs){
-  
-  mspe_array = list()
-  
-  for(i in c(1:9)){
-    #predictors_transformed <- paste(my_vector, collapse = "+")
-    formula = as.formula(paste0("incfarm", "~", predictors_transformed))
-    #input_column = append("incfarm",my_vector)
-    model = lm(formula=formula,data=train[,fplotarea1])
-    mspe_array = append(mspe_array,(mean((test$incfarm - predict(model, newdata = test[,input_column]))^2)))
+  # print(predictors)
+  predictors <- lapply(predictors, function(x) gsub("1$", "", x))
+  predictors[1] <- "fplotarea1"
+  my_vector <- unlist(predictors)
+  predictors_transformed <- paste(my_vector, collapse = "+")
+  input_column = append("incfarm",my_vector)
+  for (column in grep("`", input_column, value = TRUE)){
+    input_column[input_column==column]=substring(column,2, nchar(column) - 1)
   }
-  return (mspe_array)
+  print(input_column)
+  formula = as.formula(paste0("incfarm", "~", predictors_transformed))
+  model = lm(formula=formula,data=train[,input_column])
+  mspe_array = append(mspe_array,(mean((test$incfarm - predict(model, newdata = test[,input_column]))^2)))
 }
 
-mspe = compute_mspe(train,test,rs)
-mspe
-
-formula = as.formula(paste0("incfarm", "~", predictors_transformed))
-#input_column = append("incfarm",my_vector)
-model = lm(formula=formula,data=train[,'fplotarea1'])
+print(mspe_array)
 
 head(train)
 # Transformation on the best model
