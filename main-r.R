@@ -124,6 +124,7 @@ data$extc = as.factor(data$extc)
 str(data)
 
 write.csv(data,"D:/STAT 5010/project/STAT-5010-project/clean_data.csv")
+saveRDS(data,"D:/STAT 5010/project/STAT-5010-project/clean_data.rds")
 
 ############# EDA ############
 

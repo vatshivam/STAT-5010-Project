@@ -3,16 +3,18 @@ library(car)
 library(ggplot2)
 library(leaps)
 library(MASS)
+library(caret)
 
-data<-read.csv("~/Documents/Github/STAT-5010-Project/clean_data.csv")
+# data<-read.csv("~/Documents/Github/STAT-5010-Project/clean_data.csv")
+# saveRDS and readRDS function saves the datatype information as well, unlike read.csv 
+data<-readRDS(file="D:/STAT 5010/project/STAT-5010-project/clean_data.rds")
+
 head(data)
-
-
 
 str(data)
 
 ggcorrplot(cor(data[c('fplotarea1','farmsalev',
-                      's1p1c1qharv','s1p1c1sold','pc1','extc',
+                      's1p1c1qharv','s1p1c1sold',
                       'incfarm')]),method='circle')
 
 # We can see from the correlation plot that s1p1c1sold and s1p1c1qharv are correlated with fplotarea1
@@ -20,6 +22,38 @@ ggcorrplot(cor(data[c('fplotarea1','farmsalev',
 # As we want to predict farmers income which is in incfarm column our model will take incfarm as
 # response variable and other as predictors
 
+# removing adm0 and adm1
+
+lm_full = lm(incfarm ~ .,data=subset(data, select = -c(adm0,adm1)))
+summary(lm_full)
+
+# Taking a subset of categorical variable for simplicity:
+data = subset(data,select = -c(adm0,adm1,farmtype,hhhdocc1,yearsuse1,pc1,extc))
+
+# New full model:
+lm_full = lm(incfarm ~ .,data=data)
+summary(lm_full)
+
+# Encoding values to facilitate partial selection of different categorical features
+data = cbind(data,model.matrix(~ hhsize - 1, data = data))
+data = cbind(data,model.matrix(~ hhelectric - 1, data = data))
+data = cbind(data,model.matrix(~ s1p1c1area - 1, data = data))
+data = cbind(data,model.matrix(~ incnfarm - 1, data = data))
+
+#Removing original columns
+data = subset(data,select = -c(hhsize,hhelectric,s1p1c1area,incnfarm))
+
+for (column in grep("hhsize|hhelectric|s1p1c1area|incnfarm", names(data), value = TRUE)){
+  data[,c(column)] = as.factor(data[,c(column)])
+}
+
+str(data)
+
+# New full model:
+lm_full = lm(incfarm ~ .,data=data)
+summary(lm_full)
+
+# Ansh's original code
 
 lm_model <- lm(incfarm ~ farmtype + hhsize + hhelectric + hhhdocc1 + fplotarea1 + 
                  yearsuse1 + farmsalev + s1p1c1area + s1p1c1qharv + pc1+ s1p1c1sold, data = data)
