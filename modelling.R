@@ -125,10 +125,23 @@ ggplot(data.red_model, aes(x = yhat, y = y)) +
   labs(x = "Fitted Values", y = "Observed Values", title = "Fitted vs Observed Plot") 
 
 
+# Now we will train and test our model to check if it is able to predict income of farmers accurately
+
+set.seed(11111)
+n = floor(0.8 * nrow(data)) #find the number corresponding to 80% of the data
+index = sample(seq_len(nrow(new_data)), size = n) #randomly sample indicies to be included in the training set
+
+train = data[index, ] #set the training set to be the randomly sampled rows of the dataframe
+test = data[-index, ] #set the testing set to be the remaining rows
+cat("There are", dim(train)[1], "rows and",dim(train)[2],"columns in the training set. ")  #check the dimensions
+cat("There are", dim(test)[1], "rows and",dim(test)[2],"columns in the testing set.")  #check the dimensions
+
+
+
 # Backward Selection
 
 
-backward_model <- step(lm_full, direction = "backward", k = log(nrow(data)))
+backward_model <- step(lm_full, direction = "backward", k = log(nrow(train)))
 
 summary(backward_model)
 
@@ -144,7 +157,7 @@ forward_model <- regsubsets(incfarm ~ fplotarea1+ farmsalev + s1p1c1qharv +
                             +`s1p1c1area50-60`+ `s1p1c1area60-80`+ `s1p1c1area80-100`
                             + `s1p1c1area100-100`+`incnfarm0-0`+ `incnfarm0-0.1000000015`
                             + `incnfarm0.5-5`+ `incnfarm20-35`+ `incnfarm5-20`
-                            + `incnfarm35-52`+ `incnfarm52-80`+ `incnfarm80-100`, data = data, 
+                            + `incnfarm35-52`+ `incnfarm52-80`+ `incnfarm80-100`, data = train, 
                     method = "forward")
 
 
@@ -153,8 +166,8 @@ summary(forward_model, scale = "bic")
 # Print the coefficients of the model with the lowest BIC
 coef(forward_model, id = which.min(summary(forward_model)$bic))
 
-forward_selected_model <- lm(incfarm~ fplotarea1+ farmsalev+ s1p1c1sold + `hhsize6-7` +`incnfarm20-35`
-                  +`incnfarm80-100` + `hhsize8-48`, data=data)
+forward_selected_model <- lm(incfarm~ fplotarea1+ farmsalev+ s1p1c1sold + `hhsize6-7`
+                  +`incnfarm80-100` + `hhsize8-48`, data=train)
 
 summary(forward_selected_model)
 
@@ -167,25 +180,67 @@ reg1 = regsubsets(incfarm ~ fplotarea1+ farmsalev + s1p1c1qharv +
                   +`s1p1c1area50-60`+ `s1p1c1area60-80`+ `s1p1c1area80-100`
                   + `s1p1c1area100-100`+`incnfarm0-0`+ `incnfarm0-0.1000000015`
                   + `incnfarm0.5-5`+ `incnfarm20-35`+ `incnfarm5-20`
-                  + `incnfarm35-52`+ `incnfarm52-80`+ `incnfarm80-100`, data = data)
+                  + `incnfarm35-52`+ `incnfarm52-80`+ `incnfarm80-100`, data = train)
 rs = summary(reg1)
 rs$which
 
+for(i in c(1:9)){
+  models = rs$which[i,-1]
+  predictors = names(which(models == TRUE))
+}
 
+predictors
+
+predictors <- lapply(predictors, function(x) gsub("1$", "", x))
+
+predictors[1] <- "fplotarea1"
+
+my_list <- list("fplotarea1", "farmsalev", "s1p1c1sold", "`hhsize6-7`","`s1p1c1area100-100`",
+                "`incnfarm0-0`", "`incnfarm20-35`", "`incnfarm5-20`", "`incnfarm35-52`")
+my_vector <- unlist(my_list)
+
+
+predictors_transformed <- paste(my_vector, collapse = "+")
+
+
+input_column = append("incfarm",my_vector)
+
+compute_mspe = function(train,test,rs){
+  
+  mspe_array = list()
+  
+  for(i in c(1:9)){
+    #predictors_transformed <- paste(my_vector, collapse = "+")
+    formula = as.formula(paste0("incfarm", "~", predictors_transformed))
+    #input_column = append("incfarm",my_vector)
+    model = lm(formula=formula,data=train[,fplotarea1])
+    mspe_array = append(mspe_array,(mean((test$incfarm - predict(model, newdata = test[,input_column]))^2)))
+  }
+  return (mspe_array)
+}
+
+mspe = compute_mspe(train,test,rs)
+mspe
+
+formula = as.formula(paste0("incfarm", "~", predictors_transformed))
+#input_column = append("incfarm",my_vector)
+model = lm(formula=formula,data=train[,'fplotarea1'])
+
+head(train)
 # Transformation on the best model
 
 new_data<-data
 
 
-new_data$sqrtfplotarea1<- sqrt(data$fplotarea1)
-new_data$sqrtfarmsalev <- sqrt(data$farmsalev)
-new_data$sqrts1p1c1qharv <- sqrt(data$s1p1c1sold)
+train$sqrtfplotarea1<- sqrt(train$fplotarea1)
+train$sqrtfarmsalev <- sqrt(train$farmsalev)
+train$sqrts1p1c1qharv <- sqrt(train$s1p1c1sold)
 
 
 
 sqrt_red_model <- lm(incfarm ~ sqrtfplotarea1 + sqrtfarmsalev + s1p1c1sold + 
                        `hhsize6-7` +
-                     +`incnfarm80-100`, data = new_data)
+                     +`incnfarm80-100`, data = train)
 
 
 summary(sqrt_red_model)
@@ -243,5 +298,85 @@ ggplot(srp, aes(x = x, y = y)) +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.7))
 
+# We detected non-constant variance and we will try to make it constant using WLSS
+
+weights <- 1 / (fitted(sqrt_red_model)^2)
+
+sqrt_red_model_wls <- lm(incfarm ~ sqrtfplotarea1 + sqrtfarmsalev + s1p1c1sold + 
+                       `hhsize6-7` +
+                       +`incnfarm80-100`, data = new_data,weights=weights)
 
 
+
+
+ggplot(data=as.data.frame(new_data))+
+  geom_point(aes(x=fitted(sqrt_red_model),y=resid(sqrt_red_model)))+
+  ggtitle("Residuals vs Fitted")+
+  xlab("Predicted")+
+  ylab("Residuals")+
+  theme(plot.title = element_text(hjust=0.5))+
+  geom_smooth(aes(x=fitted(sqrt_red_model),y=resid(sqrt_red_model)),se=FALSE)+
+  geom_hline(yintercept=0)
+
+ggplot(data=as.data.frame(new_data))+
+  geom_point(aes(x=fitted(sqrt_red_model_wls),y=resid(sqrt_red_model_wls)))+
+  ggtitle("Residuals vs Fitted w WLSS")+
+  xlab("Predicted")+
+  ylab("Residuals")+
+  theme(plot.title = element_text(hjust=0.5))+
+  geom_smooth(aes(x=fitted(sqrt_red_model_wls),y=resid(sqrt_red_model_wls)),se=FALSE)+
+  geom_hline(yintercept=0)
+
+
+summary(sqrt_red_model_wls)
+
+
+ggplot(data=as.data.frame(new_data),aes(sample=resid(sqrt_red_model_wls)))+
+  stat_qq() +
+  stat_qq_line()+
+  ggtitle("QQ plot for Residuals w WLSS")+
+  theme(plot.title = element_text(hjust=0.5))
+
+ggplot(data=as.data.frame(new_data))+
+  geom_point(aes(x=incfarm,y=fitted(sqrt_red_model_wls)),alpha=0.5,position="jitter")+
+  ggtitle("Fitted vs Observed w WLSS")+
+  xlab("Observed")+
+  ylab("Predicted")+
+  theme(plot.title = element_text(hjust=0.5))+
+  geom_smooth(aes(x=incfarm,y=fitted(sqrt_red_model_wls)),se=FALSE,color='red')+
+  geom_abline(slope=1,intercept = 0,color='black',linewidth=1)
+
+n = dim(as.data.frame(new_data))[1]; 
+x = head(resid(sqrt_red_model_wls), n-1)
+y = tail(resid(sqrt_red_model_wls), n-1)
+srp = data.frame(x,y)
+
+ggplot(srp, aes(x = x, y = y)) + 
+  geom_point() + 
+  geom_vline(xintercept = 0) + 
+  geom_hline(yintercept = 0) + 
+  geom_smooth(aes(x=x,y=y),se=F) +
+  xlab(expression(hat(epsilon)[i])) +
+  ylab(expression(hat(epsilon)[i+1])) + 
+  ggtitle("Successive Residual Plot w WLSS") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.7))
+
+
+sqrt_red_model <- lm(incfarm ~ sqrtfplotarea1 + sqrtfarmsalev + s1p1c1sold + 
+                       `hhsize6-7` +
+                       +`incnfarm80-100`, data = train)
+
+summary(sqrt_red_model)
+
+weights <- 1 / (fitted(sqrt_red_model)^2)
+
+sqrt_red_model_wls <- lm(incfarm ~ sqrtfplotarea1 + sqrtfarmsalev + s1p1c1sold + 
+                           `hhsize6-7` +
+                           +`incnfarm80-100`, data = train,weights=weights)
+
+summary(sqrt_red_model_wls)
+
+predictions <- predict(sqrt_red_model_wls, newdata = test)
+mspe <- mean(test$incfarm - predictions)^2  
+print(mspe)
