@@ -459,4 +459,4 @@ predictions <- predict(ridge_fit, newx = X_test, s=16)
 
 # Calculate the MSPE
 mspe <- mean((y_test - predictions)^2)
-mspe
+mspew
