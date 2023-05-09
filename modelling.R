@@ -70,7 +70,7 @@ str(data_reduced)
 lm_full = lm(incfarm ~ .,data=data_reduced)
 summary(lm_full)
 
-
+anova(lm_full)
 set.seed(11111)
 n = floor(0.8 * nrow(data_reduced)) #find the number corresponding to 80% of the data
 index = sample(seq_len(nrow(data_reduced)), size = n) #randomly sample indicies to be included in the training set
@@ -180,7 +180,7 @@ forward_model <- regsubsets(incfarm ~ fplotarea1+ farmsalev + s1p1c1qharv +
 
 summary(forward_model, scale = "bic")
 
-# Print the coefficients of the model with the lowest BIC
+# Print the coefficients of the model with the lowest BIC using forward selection
 coef(forward_model, id = which.min(summary(forward_model)$bic))
 
 forward_selected_model <- lm(incfarm~ fplotarea1+ farmsalev+ s1p1c1sold +s1p1c1qharv
@@ -229,7 +229,7 @@ best_mspe_model <- lm(incfarm ~ fplotarea1+ farmsalev + s1p1c1qharv +
   s1p1c1sold  +`hhsize8-48`+ `s1p1c1area80-100`
 +`incnfarm0-0`+ `incnfarm0-0.1000000015`+`incnfarm80-100`,data=train)
 summary(best_mspe_model)
-
+print(mspe_array[9])
 # From the adjusted R squared value we got the best vaue for our backward model
 
 # incfarm ~  `hhsize4-6`+`hhsize7-8` +`s1p1c1area20-35.20999908`+`s1p1c1area35.20999908-50`+`incnfarm0-0` +
